@@ -55,25 +55,45 @@ return_book(isbn): возвращает книгу в библиотеку.
 7. Выход
 """
 
+import json
+from datetime import datetime, timedelta
+
+
 class Book:
     def __init__(self, title, author, year, isbn):
         self.title = title
         self.author = author
         self.year = year
         self.isbn = isbn
-        self.is_available = True
+        self.is_available = True  # Книга по умолчанию доступна
+        self.borrowed_by = None  # Переменная для хранения информации о пользователе, который взял книгу
+        self.due_date = None  # Дата возврата книги
 
-    def borrow(self):
+    def borrow(self, user):
+        # Проверка доступности книги для выдачи
         if self.is_available:
-            self.is_available = False
-            return f"Книга '{self.title}' успешно взята."
-        return f"Книга '{self.title}' уже занята."
+            self.is_available = False  # Меняем статус на "взята"
+            self.borrowed_by = user  # Записываем, кто взял книгу
+            self.due_date = datetime.now() + timedelta(days=14)  # Устанавливаем срок возврата через 14 дней
+            return f"Книга '{self.title}' взята пользователем {user}. Дата возврата: {self.due_date.strftime('%Y-%m-%d')}"
+        else:
+            return f"Книга '{self.title}' уже взята пользователем {self.borrowed_by}. Дата возврата: {self.due_date.strftime('%Y-%m-%d')}"
 
     def return_book(self):
+        # Проверка возврата книги
         if not self.is_available:
-            self.is_available = True
-            return f"Книга '{self.title}' возвращена и доступна."
+            self.is_available = True  # Меняем статус на "доступна"
+            user = self.borrowed_by
+            self.borrowed_by = None  # Очищаем информацию о пользователе
+            self.due_date = None  # Очищаем дату возврата
+            return f"Книга '{self.title}' возвращена пользователем {user}."
         return f"Книга '{self.title}' уже доступна."
+
+    def get_full_info(self):
+        # Получение полной информации о книге
+        availability = "доступна" if self.is_available else f"взята, возвращена {self.due_date.strftime('%Y-%m-%d')}"
+        return f"Название: {self.title}, Автор: {self.author}, Год: {self.year}, ISBN: {self.isbn}, Статус: {availability}"
+
 
 
 # Класс Library не должен наследоваться от Books (Библиотека — это контейнер для книг, а не разновидность книги)
@@ -82,10 +102,12 @@ class Library:
         self.books = []  # Инициализация пустого списка книг
 
     def add_book(self, book):
+        # Добавление книги в библиотеку
         self.books.append(book)
         return f"Книга '{book.title}' добавлена в библиотеку."
 
     def remove_book(self, isbn):
+        # Удаление книги из библиотеки по ISBN
         for book in self.books:
             if book.isbn == isbn:
                 self.books.remove(book)
@@ -93,30 +115,48 @@ class Library:
         return "Книга с таким ISBN не найдена."
 
     def find_books_by_author(self, author):
+        # Поиск книг по автору
         found_books = [book for book in self.books if book.author == author]
         if found_books:
             return "\n".join([f"{book.title} ({book.year})" for book in found_books])
         return "Книг этого автора не найдено."
 
     def list_available_books(self):
+        # Список доступных книг
         available_books = [book for book in self.books if book.is_available]
         if available_books:
-            return "\n".join(
-                [f"{book.title} ({book.author}, {book.year}, ISBN: {book.isbn})" for book in available_books]
-            )
+            return "\n".join([f"{book.title} ({book.author}, {book.year}, ISBN: {book.isbn})" for book in available_books])
         return "Нет доступных книг."
 
-    def borrow_book(self, isbn):
+    def borrow_book(self, isbn, user):
+        # Выдача книги по ISBN
         for book in self.books:
             if book.isbn == isbn:
-                return book.borrow()
+                return book.borrow(user)
         return "Книга с таким ISBN не найдена."
 
     def return_book(self, isbn):
+        # Возврат книги по ISBN
         for book in self.books:
             if book.isbn == isbn:
                 return book.return_book()
         return "Книга с таким ISBN не найдена."
+
+    def save_to_file(self, filename="library.json"):
+        # Сохранение библиотеки в файл
+        with open(filename, "w", encoding="utf-8") as file:
+            json.dump([book.__dict__ for book in self.books], file, indent=4)
+
+    def open_file(self, filename="library.json"):
+        # Загрузка библиотеки из файла
+        try:
+            with open(filename, 'r', encoding='utf-8') as file:
+                books_data = json.load(file)
+                for data in books_data:
+                    book = Book(**data)
+                    self.books.append(book)
+        except FileNotFoundError:
+            print("Файл с данными библиотеки не найден.")
 
 # Интерфейс для работы с библиотекой
 def main():
@@ -161,7 +201,8 @@ def main():
 
         elif answer == "5":
             isbn = input("Введите ISBN книги, которую хотите взять: ")
-            print(library.borrow_book(isbn))
+            user = input("Введите имя пользователя: ")
+            print(library.borrow_book(isbn, user))
 
         elif answer == "6":
             isbn = input("Введите ISBN книги, которую хотите вернуть: ")
@@ -174,5 +215,5 @@ def main():
         else:
             print("Неверный выбор!")
 
-
-main()
+if __name__ == "__main__":
+    main()
